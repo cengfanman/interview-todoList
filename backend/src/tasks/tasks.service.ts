@@ -53,10 +53,13 @@ export class TasksService {
       .leftJoinAndSelect('task.followers', 'followers')
       .leftJoinAndSelect('followers.user', 'followerUser')
       .leftJoinAndSelect('task.subtasks', 'subtasks')
+      .leftJoinAndSelect('subtasks.assignee', 'subtaskAssignee')
       .where(
         '(task.creatorId = :userId OR task.assigneeId = :userId OR followers.userId = :userId)',
         { userId },
-      );
+      )
+      // Only show top-level tasks (not subtasks)
+      .andWhere('task.parentTaskId IS NULL');
 
     // Apply filters
     if (filterDto) {

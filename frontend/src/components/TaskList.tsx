@@ -98,7 +98,14 @@ const TaskList: React.FC = () => {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
-      render: (text) => <strong>{text}</strong>,
+      render: (text, record) => (
+        <Space>
+          <strong>{text}</strong>
+          {record.subtasks && record.subtasks.length > 0 && (
+            <Tag color="blue">{record.subtasks.length} subtasks</Tag>
+          )}
+        </Space>
+      ),
     },
     {
       title: 'Status',

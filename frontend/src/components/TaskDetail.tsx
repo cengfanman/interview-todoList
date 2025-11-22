@@ -13,6 +13,7 @@ import {
   Modal,
   List,
   Card,
+  DatePicker,
 } from 'antd';
 import { PlusOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -89,6 +90,8 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
         ...values,
         teamId: task.teamId,
         parentTaskId: task.id,
+        startTime: values.startTime?.toISOString(),
+        dueTime: values.dueTime?.toISOString(),
       });
       message.success('Subtask created successfully');
       setIsSubtaskModalVisible(false);
@@ -214,11 +217,28 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                       >
                         {subtask.status}
                       </Tag>
+                      <Tag
+                        color={subtask.priority === TaskPriority.URGENT ? 'red' : 'blue'}
+                        style={{ marginLeft: 4 }}
+                      >
+                        {subtask.priority}
+                      </Tag>
                     </div>
                     {subtask.description && <div>{subtask.description}</div>}
                     {subtask.assignee && (
                       <div>
-                        <UserOutlined /> {subtask.assignee.username}
+                        <UserOutlined /> Assignee: {subtask.assignee.username}
+                      </div>
+                    )}
+                    {(subtask.startTime || subtask.dueTime) && (
+                      <div style={{ fontSize: '12px', color: '#888' }}>
+                        {subtask.startTime && (
+                          <span>Start: {dayjs(subtask.startTime).format('YYYY-MM-DD HH:mm')}</span>
+                        )}
+                        {subtask.startTime && subtask.dueTime && <span> | </span>}
+                        {subtask.dueTime && (
+                          <span>Due: {dayjs(subtask.dueTime).format('YYYY-MM-DD HH:mm')}</span>
+                        )}
                       </div>
                     )}
                   </Space>
@@ -304,6 +324,14 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
               <Select.Option value={TaskPriority.HIGH}>High</Select.Option>
               <Select.Option value={TaskPriority.URGENT}>Urgent</Select.Option>
             </Select>
+          </Form.Item>
+
+          <Form.Item name="startTime" label="Start Time">
+            <DatePicker showTime style={{ width: '100%' }} placeholder="Select start time (optional)" />
+          </Form.Item>
+
+          <Form.Item name="dueTime" label="Due Time">
+            <DatePicker showTime style={{ width: '100%' }} placeholder="Select due time (optional)" />
           </Form.Item>
 
           <Form.Item>

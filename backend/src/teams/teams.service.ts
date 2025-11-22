@@ -38,7 +38,7 @@ export class TeamsService {
     // Find teams where user is a member
     const members = await this.teamMembersRepository.find({
       where: { userId },
-      relations: ['team', 'team.creator'],
+      relations: ['team', 'team.creator', 'team.members', 'team.members.user'],
     });
 
     return members.map((m) => ({
