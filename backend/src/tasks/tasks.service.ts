@@ -144,17 +144,21 @@ export class TasksService {
     // If status changed to completed, set completedAt
     if (
       updateTaskDto.status === TaskStatus.COMPLETED &&
-      task.status !== TaskStatus.COMPLETED
+      oldValues.status !== TaskStatus.COMPLETED
     ) {
       task.completedAt = new Date();
-
-      // Check and auto-complete parent task if all subtasks are completed
-      if (task.parentTaskId) {
-        await this.checkAndCompleteParentTask(task.parentTaskId);
-      }
     }
 
     const updatedTask = await this.tasksRepository.save(task);
+
+    // Check and auto-complete parent task if all subtasks are completed
+    if (
+      updateTaskDto.status === TaskStatus.COMPLETED &&
+      oldValues.status !== TaskStatus.COMPLETED &&
+      task.parentTaskId
+    ) {
+      await this.checkAndCompleteParentTask(task.parentTaskId);
+    }
 
     // Create history record
     await this.createHistory({
@@ -248,11 +252,17 @@ export class TasksService {
   }
 
   async getHistory(taskId: string, userId: string) {
-    await this.findOne(taskId, userId);
+    const task = await this.findOne(taskId, userId);
+
+    // 获取所有子任务的 ID
+    const subtaskIds = task.subtasks?.map(st => st.id) || [];
+    
+    // 查询主任务和所有子任务的历史记录
+    const taskIds = [taskId, ...subtaskIds];
 
     return this.taskHistoryRepository.find({
-      where: { taskId },
-      relations: ['user'],
+      where: { taskId: In(taskIds) },
+      relations: ['user', 'task'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -282,19 +292,46 @@ export class TasksService {
   }
 
   private async checkAndCompleteParentTask(parentTaskId: string) {
+    console.log(`[checkAndCompleteParentTask] Checking parent task: ${parentTaskId}`);
+    
+    // 重新查询父任务，确保获取最新数据
     const parentTask = await this.tasksRepository.findOne({
       where: { id: parentTaskId },
-      relations: ['subtasks'],
     });
 
-    if (!parentTask) return;
+    if (!parentTask) {
+      console.log(`[checkAndCompleteParentTask] Parent task not found: ${parentTaskId}`);
+      return;
+    }
 
-    // Check if all subtasks are completed
-    const allCompleted = parentTask.subtasks.every(
+    console.log(`[checkAndCompleteParentTask] Parent task status: ${parentTask.status}`);
+
+    // 重新查询所有子任务，确保获取最新状态
+    const subtasks = await this.tasksRepository.find({
+      where: { parentTaskId: parentTaskId },
+    });
+
+    console.log(`[checkAndCompleteParentTask] Found ${subtasks?.length || 0} subtasks`);
+    subtasks?.forEach((st, idx) => {
+      console.log(`[checkAndCompleteParentTask] Subtask ${idx + 1}: ${st.title} - Status: ${st.status}`);
+    });
+
+    // 如果没有子任务，不处理
+    if (!subtasks || subtasks.length === 0) {
+      console.log(`[checkAndCompleteParentTask] No subtasks found, skipping`);
+      return;
+    }
+
+    // 检查是否所有子任务都已完成
+    const allCompleted = subtasks.every(
       (subtask) => subtask.status === TaskStatus.COMPLETED,
     );
 
+    console.log(`[checkAndCompleteParentTask] All subtasks completed: ${allCompleted}`);
+
+    // 如果所有子任务都完成了，且父任务还未完成，则自动完成父任务
     if (allCompleted && parentTask.status !== TaskStatus.COMPLETED) {
+      console.log(`[checkAndCompleteParentTask] Auto-completing parent task: ${parentTask.title}`);
       parentTask.status = TaskStatus.COMPLETED;
       parentTask.completedAt = new Date();
       await this.tasksRepository.save(parentTask);
@@ -303,8 +340,15 @@ export class TasksService {
         taskId: parentTaskId,
         userId: parentTask.creatorId,
         actionType: TaskHistoryActionType.COMPLETED,
-        changes: { autoCompleted: true, reason: 'All subtasks completed' },
+        changes: { 
+          autoCompleted: true, 
+          reason: 'All subtasks completed',
+          subtaskCount: subtasks.length,
+        },
       });
+      console.log(`[checkAndCompleteParentTask] Parent task auto-completed successfully`);
+    } else {
+      console.log(`[checkAndCompleteParentTask] Parent task not auto-completed. AllCompleted: ${allCompleted}, CurrentStatus: ${parentTask.status}`);
     }
   }
 }

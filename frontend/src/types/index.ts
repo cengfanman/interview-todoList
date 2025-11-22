@@ -84,6 +84,7 @@ export interface TaskHistory {
   taskId: string;
   userId: string;
   user: User;
+  task?: Task;
   actionType: string;
   changes?: any;
   comment?: string;
