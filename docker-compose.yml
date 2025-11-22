@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: todolist-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: todolist_db
+      MYSQL_USER: todolist_user
+      MYSQL_PASSWORD: todolist_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - todolist-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NestJS Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: todolist-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: todolist_user
+      DB_PASSWORD: todolist_password
+      DB_DATABASE: todolist_db
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 7d
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - todolist-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: todolist-frontend
+    restart: always
+    ports:
+      - "8888:80"
+    depends_on:
+      - backend
+    networks:
+      - todolist-network
+    environment:
+      REACT_APP_API_URL: http://localhost:3000
+
+volumes:
+  mysql_data:
+
+networks:
+  todolist-network:
+    driver: bridge
