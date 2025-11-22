@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Table,
   Button,
@@ -11,14 +11,23 @@ import {
   DatePicker,
   message,
   Drawer,
+  Alert,
+  Switch,
 } from 'antd';
-import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlusOutlined, EyeOutlined, BellOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { taskService } from '../services/taskService';
 import { teamService } from '../services/teamService';
 import { Task, TaskStatus, TaskPriority, Team } from '../types';
 import TaskDetail from './TaskDetail';
+import {
+  startTaskDueChecker,
+  stopTaskDueChecker,
+  clearAllNotifications,
+  requestNotificationPermission,
+  getNotificationPermission,
+} from '../utils/taskNotification';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -29,12 +38,49 @@ const TaskList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const [browserNotificationPermission, setBrowserNotificationPermission] = useState<string | null>(null);
   const [form] = Form.useForm();
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadTasks();
     loadTeams();
+    
+    // 检查浏览器通知权限
+    const permission = getNotificationPermission();
+    setBrowserNotificationPermission(permission);
+
+    // 启动任务到期检查
+    if (notificationEnabled) {
+      timerRef.current = startTaskDueChecker(() => tasks);
+    }
+
+    // 清理函数
+    return () => {
+      if (timerRef.current) {
+        stopTaskDueChecker(timerRef.current);
+      }
+      clearAllNotifications();
+    };
   }, []);
+
+  // 当任务列表更新或通知开关变化时，重新启动检查
+  useEffect(() => {
+    if (timerRef.current) {
+      stopTaskDueChecker(timerRef.current);
+    }
+
+    if (notificationEnabled && tasks.length > 0) {
+      timerRef.current = startTaskDueChecker(() => tasks);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        stopTaskDueChecker(timerRef.current);
+      }
+    };
+  }, [tasks, notificationEnabled]);
 
   const loadTasks = async () => {
     try {
@@ -152,13 +198,86 @@ const TaskList: React.FC = () => {
     },
   ];
 
+  const handleNotificationToggle = (checked: boolean) => {
+    setNotificationEnabled(checked);
+    if (checked) {
+      message.success('任务到期提醒已启用');
+      // 请求浏览器通知权限
+      if (browserNotificationPermission === 'default') {
+        requestNotificationPermission();
+        setTimeout(() => {
+          setBrowserNotificationPermission(getNotificationPermission());
+        }, 1000);
+      }
+    } else {
+      message.info('任务到期提醒已关闭');
+      clearAllNotifications();
+    }
+  };
+
+  const handleEnableBrowserNotification = () => {
+    requestNotificationPermission();
+    setTimeout(() => {
+      const permission = getNotificationPermission();
+      setBrowserNotificationPermission(permission);
+      if (permission === 'granted') {
+        message.success('浏览器通知权限已授予');
+      } else if (permission === 'denied') {
+        message.error('浏览器通知权限被拒绝，请在浏览器设置中启用');
+      }
+    }, 1000);
+  };
+
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+      {/* 通知设置提示 */}
+      {browserNotificationPermission === 'default' && notificationEnabled && (
+        <Alert
+          message="启用桌面通知"
+          description={
+            <div>
+              <div style={{ marginBottom: 8 }}>
+                启用桌面通知后，即使浏览器在后台运行，您也能收到任务到期提醒。
+              </div>
+              <Button size="small" type="primary" onClick={handleEnableBrowserNotification}>
+                授予通知权限
+              </Button>
+            </div>
+          }
+          type="info"
+          closable
+          style={{ marginBottom: 16 }}
+          icon={<BellOutlined />}
+        />
+      )}
+
+      {browserNotificationPermission === 'denied' && notificationEnabled && (
+        <Alert
+          message="浏览器通知已被阻止"
+          description="如需启用桌面通知，请在浏览器设置中允许本网站显示通知。"
+          type="warning"
+          closable
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>My Tasks</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>
-          New Task
-        </Button>
+        <Space>
+          <Space>
+            <BellOutlined style={{ color: notificationEnabled ? '#1890ff' : '#999' }} />
+            <span>任务提醒</span>
+            <Switch
+              checked={notificationEnabled}
+              onChange={handleNotificationToggle}
+              checkedChildren="开"
+              unCheckedChildren="关"
+            />
+          </Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>
+            New Task
+          </Button>
+        </Space>
       </div>
 
       <Table

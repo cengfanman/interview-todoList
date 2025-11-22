@@ -56,6 +56,11 @@
 - [x] 指派执行人
 - [x] 添加关注人
 - [x] 设置开始时间和截止时间
+- [x] **前端实时到期提醒** ⭐ 新增
+  - 1小时/30分钟/15分钟/5分钟多时间点提醒
+  - 页面内通知 + 浏览器桌面通知
+  - 可开启/关闭提醒功能
+  - 智能防止重复提醒
 
 #### 4. 子任务
 - [x] 创建子任务（与主任务结构相同）
@@ -497,6 +502,32 @@ A: 目前需要：
 ## 许可证
 
 MIT License
+
+---
+
+## 📚 文档
+
+- **[FRONTEND_NOTIFICATION.md](./FRONTEND_NOTIFICATION.md)** ⭐ - 前端任务到期提醒功能
+  - 使用指南和配置说明
+  - 浏览器通知权限设置
+  - 测试方法和常见问题
+
+- **[TESTING_GUIDE.md](./TESTING_GUIDE.md)** - 测试指南
+  - 时区设置验证
+  - 定时任务功能测试
+  - Cron 表达式说明
+  - 常见问题解答
+
+- **[TIMEZONE_AND_AUTH.md](./TIMEZONE_AND_AUTH.md)** - 时区和认证说明
+  - 北京时区配置详解
+  - JWT 认证实现说明
+  - 快速验证方法
+
+- **[NOTIFICATION_RECURRING_TASK_DESIGN.md](./NOTIFICATION_RECURRING_TASK_DESIGN.md)** - 扩展功能设计
+  - 消息提醒任务即将到期的详细设计
+  - 定时重复任务的详细设计
+
+- **[API 文档](http://localhost:3000/api/docs)** - Swagger 自动生成的 API 文档（需启动项目后访问）
 
 ---
 
