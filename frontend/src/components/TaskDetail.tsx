@@ -267,16 +267,33 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
 
       <Divider />
 
-      <h3>History</h3>
+      <h3 style={{ marginBottom: 16 }}>History</h3>
       <Timeline
         items={history.map((item) => ({
           children: (
-            <div>
-              <div>
-                <strong>{item.user.username}</strong> - {item.actionType.replace('_', ' ')}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8 }}>
+                <strong style={{ fontSize: 14 }}>{item.user.username}</strong>
+                <span style={{ color: '#666', marginLeft: 8 }}>
+                  {item.actionType.replace(/_/g, ' ')}
+                </span>
               </div>
-              {item.comment && <div style={{ marginTop: 8 }}>{item.comment}</div>}
-              <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+              {item.comment && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    marginBottom: 8,
+                    padding: '8px 12px',
+                    background: '#f5f5f5',
+                    borderRadius: 4,
+                    fontSize: 14,
+                    lineHeight: '1.6',
+                  }}
+                >
+                  {item.comment}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>
                 {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
               </div>
             </div>
