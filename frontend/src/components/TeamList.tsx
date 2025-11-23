@@ -26,6 +26,8 @@ const TeamList: React.FC = () => {
     try {
       setLoading(true);
       const data = await teamService.getAll();
+      console.log('Loaded teams:', data);
+      console.log('Team members count:', data.map(t => ({ name: t.name, memberCount: t.members?.length || 0, members: t.members })));
       setTeams(data);
     } catch (error) {
       message.error('Failed to load teams');

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Table,
   Button,
@@ -59,60 +59,7 @@ const TaskList: React.FC = () => {
   const [form] = Form.useForm();
   const [filterForm] = Form.useForm();
 
-  useEffect(() => {
-    loadTasks();
-    loadTeams();
-    loadAllUsers();
-  }, []);
-
-  useEffect(() => {
-    filterTasks();
-  }, [tasks, taskFilter]);
-
-  useEffect(() => {
-    loadTasksWithFilters();
-  }, [advancedFilters]);
-
-  const loadTasks = async () => {
-    try {
-      setLoading(true);
-      const data = await taskService.getAll();
-      setTasks(data);
-      
-      // 如果当前有选中的任务，重新从列表中获取最新数据
-      if (selectedTask) {
-        const updatedTask = data.find((t: Task) => t.id === selectedTask.id);
-        if (updatedTask) {
-          setSelectedTask(updatedTask);
-        }
-      }
-    } catch (error) {
-      message.error('加载任务失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTasksWithFilters = async () => {
-    try {
-      setLoading(true);
-      const data = await taskService.getAll(advancedFilters);
-      setTasks(data);
-      
-      // 如果当前有选中的任务，重新从列表中获取最新数据
-      if (selectedTask) {
-        const updatedTask = data.find((t: Task) => t.id === selectedTask.id);
-        if (updatedTask) {
-          setSelectedTask(updatedTask);
-        }
-      }
-    } catch (error) {
-      message.error('加载任务失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // 定义函数 - 必须在useEffect之前
   const loadAllUsers = async () => {
     try {
       const response = await api.get('/users');
@@ -145,36 +92,101 @@ const TaskList: React.FC = () => {
     loadTeamMembers(teamId);
   };
 
-  const filterTasks = () => {
-    if (taskFilter === 'all') {
-      setFilteredTasks(tasks);
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+      const data = await taskService.getAll();
+      console.log('Loaded tasks:', data);
+      console.log('Tasks with subtasks:', data.filter(t => t.subtasks && t.subtasks.length > 0));
+      setTasks(data);
+      setFilteredTasks(data);
+
+      // 如果当前有选中的任务，重新从列表中获取最新数据
+      if (selectedTask) {
+        const updatedTask = data.find((t: Task) => t.id === selectedTask.id);
+        if (updatedTask) {
+          setSelectedTask(updatedTask);
+        }
+      }
+    } catch (error) {
+      message.error('加载任务失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTasksWithFilters = async () => {
+    try {
+      setLoading(true);
+      const data = await taskService.getAll(advancedFilters);
+      console.log('Advanced filter result:', data);
+      setTasks(data);
+      setFilteredTasks(data);
+
+      // 如果当前有选中的任务，重新从列表中获取最新数据
+      if (selectedTask) {
+        const updatedTask = data.find((t: Task) => t.id === selectedTask.id);
+        if (updatedTask) {
+          setSelectedTask(updatedTask);
+        }
+      }
+    } catch (error) {
+      message.error('加载任务失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 初始加载
+  useEffect(() => {
+    loadTeams();
+    loadAllUsers();
+  }, []);
+
+  // 当筛选条件改变时，重新加载任务
+  useEffect(() => {
+    console.log('useEffect triggered, user:', user, 'taskFilter:', taskFilter);
+    // 优先使用 user.id，如果没有则从 localStorage 获取
+    const currentUserId = user?.id || localStorage.getItem('userId');
+    if (!currentUserId) {
+      console.log('No user, skipping load');
       return;
     }
 
-    const currentUserId = user?.id;
-    if (!currentUserId) {
-      setFilteredTasks(tasks);
-      return;
+    if (Object.keys(advancedFilters).length > 0) {
+      // 有高级筛选时使用高级筛选
+      console.log('Using advanced filters');
+      loadTasksWithFilters();
+    } else {
+      // 快捷筛选
+      console.log('Using quick filter');
+      const loadFilteredTasks = async () => {
+        try {
+          setLoading(true);
+          let params: any = {};
+
+          if (taskFilter === 'my') {
+            params.creatorId = currentUserId;
+          } else if (taskFilter === 'assigned') {
+            params.assigneeId = currentUserId;
+          }
+          // taskFilter === 'all' 时 params 为空对象，会获取所有任务
+
+          console.log('Quick filter params:', params);
+          const data = await taskService.getAll(params);
+          console.log('Quick filter result:', data);
+          setTasks(data);
+          setFilteredTasks(data);
+        } catch (error) {
+          message.error('加载任务失败');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadFilteredTasks();
     }
-    
-    const filtered = tasks.filter(task => {
-      switch (taskFilter) {
-        case 'my':
-          // 我创建的任务
-          return task.creatorId === currentUserId;
-        case 'assigned':
-          // 被指派给我的任务
-          return task.assigneeId === currentUserId;
-        case 'following':
-          // 我关注的任务
-          return task.followers?.some(f => f.userId === currentUserId);
-        default:
-          return true;
-      }
-    });
-    
-    setFilteredTasks(filtered);
-  };
+  }, [taskFilter, advancedFilters, user]);
 
   const handleAdvancedFilter = (values: any) => {
     const filters: AdvancedFilters = {
@@ -259,14 +271,17 @@ const TaskList: React.FC = () => {
       title: '标题',
       dataIndex: 'title',
       key: 'title',
-      render: (text, record) => (
-        <Space>
-          <strong>{text}</strong>
-          {record.subtasks && record.subtasks.length > 0 && (
-            <Tag color="blue">{record.subtasks.length} 个子任务</Tag>
-          )}
-        </Space>
-      ),
+      render: (text, record) => {
+        console.log('Rendering task:', text, 'subtasks:', record.subtasks);
+        return (
+          <Space>
+            <strong>{text}</strong>
+            {record.subtasks && record.subtasks.length > 0 && (
+              <Tag color="blue">{record.subtasks.length} 个子任务</Tag>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: '状态',
