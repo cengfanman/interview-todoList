@@ -15,7 +15,7 @@ import {
   Card,
   DatePicker,
 } from 'antd';
-import { PlusOutlined, UserOutlined } from '@ant-design/icons';
+import { PlusOutlined, UserOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { taskService } from '../services/taskService';
 import { Task, TaskHistory, TaskStatus, TaskPriority } from '../types';
@@ -109,56 +109,97 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
     try {
       setLoading(true);
       await taskService.addComment(task.id, values.comment);
-      message.success('Comment added');
+      message.success('评论已添加');
       commentForm.resetFields();
       loadHistory();
     } catch (error) {
-      message.error('Failed to add comment');
+      message.error('添加评论失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: string, subtaskTitle: string) => {
+    Modal.confirm({
+      title: '确认删除子任务',
+      content: `确定要删除子任务"${subtaskTitle}"吗？此操作不可恢复。`,
+      okText: '确定删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await taskService.delete(subtaskId);
+          message.success('子任务已删除');
+          onUpdate();
+          loadHistory();
+        } catch (error) {
+          message.error('删除失败');
+        }
+      },
+    });
+  };
+
+  const handleSubtaskStatusChange = async (subtaskId: string, status: TaskStatus) => {
+    try {
+      await taskService.update(subtaskId, { status });
+      message.success('子任务状态已更新');
+      onUpdate();
+      loadHistory();
+    } catch (error) {
+      message.error('更新失败');
     }
   };
 
   return (
     <div>
       <Descriptions column={1} bordered>
-        <Descriptions.Item label="Title">{task.title}</Descriptions.Item>
-        <Descriptions.Item label="Description">
+        <Descriptions.Item label="任务标题">{task.title}</Descriptions.Item>
+        <Descriptions.Item label="任务描述">
           {task.description || '-'}
         </Descriptions.Item>
-        <Descriptions.Item label="Status">
+        <Descriptions.Item label="任务状态">
           <Space>
             <Tag color={task.status === TaskStatus.COMPLETED ? 'success' : 'processing'}>
-              {task.status.replace('_', ' ').toUpperCase()}
+              {{
+                [TaskStatus.PENDING]: '待处理',
+                [TaskStatus.IN_PROGRESS]: '进行中',
+                [TaskStatus.COMPLETED]: '已完成',
+                [TaskStatus.CANCELLED]: '已取消',
+              }[task.status]}
             </Tag>
             <Select
               value={task.status}
               onChange={handleStatusChange}
-              style={{ width: 150 }}
+              style={{ width: 120 }}
               size="small"
             >
-              <Option value={TaskStatus.PENDING}>Pending</Option>
-              <Option value={TaskStatus.IN_PROGRESS}>In Progress</Option>
-              <Option value={TaskStatus.COMPLETED}>Completed</Option>
-              <Option value={TaskStatus.CANCELLED}>Cancelled</Option>
+              <Option value={TaskStatus.PENDING}>待处理</Option>
+              <Option value={TaskStatus.IN_PROGRESS}>进行中</Option>
+              <Option value={TaskStatus.COMPLETED}>已完成</Option>
+              <Option value={TaskStatus.CANCELLED}>已取消</Option>
             </Select>
           </Space>
         </Descriptions.Item>
-        <Descriptions.Item label="Priority">
+        <Descriptions.Item label="优先级">
           <Tag color={task.priority === TaskPriority.URGENT ? 'red' : 'blue'}>
-            {task.priority.toUpperCase()}
+            {{
+              [TaskPriority.LOW]: '低',
+              [TaskPriority.MEDIUM]: '中',
+              [TaskPriority.HIGH]: '高',
+              [TaskPriority.URGENT]: '紧急',
+            }[task.priority]}
           </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Creator">{task.creator.username}</Descriptions.Item>
-        <Descriptions.Item label="Assignee">
+        <Descriptions.Item label="创建人">{task.creator.username}</Descriptions.Item>
+        <Descriptions.Item label="执行人">
           <Space>
             {task.assignee?.username || '-'}
             <Select
               value={task.assigneeId || undefined}
               onChange={handleAssigneeChange}
-              style={{ width: 200 }}
+              style={{ width: 180 }}
               size="small"
-              placeholder="Assign to..."
+              placeholder="指派给..."
               allowClear
             >
               {teamMembers.map((member) => (
@@ -169,28 +210,28 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
             </Select>
           </Space>
         </Descriptions.Item>
-        <Descriptions.Item label="Team">{task.team?.name}</Descriptions.Item>
-        <Descriptions.Item label="Start Time">
+        <Descriptions.Item label="所属团队">{task.team?.name}</Descriptions.Item>
+        <Descriptions.Item label="开始时间">
           {task.startTime ? dayjs(task.startTime).format('YYYY-MM-DD HH:mm') : '-'}
         </Descriptions.Item>
-        <Descriptions.Item label="Due Time">
+        <Descriptions.Item label="截止时间">
           {task.dueTime ? dayjs(task.dueTime).format('YYYY-MM-DD HH:mm') : '-'}
         </Descriptions.Item>
-        <Descriptions.Item label="Followers">
+        <Descriptions.Item label="关注人">
           {task.followers?.map((f) => (
             <Tag key={f.id}>{f.user.username}</Tag>
           )) || '-'}
         </Descriptions.Item>
-        <Descriptions.Item label="Subtasks">
+        <Descriptions.Item label="子任务">
           <Space>
-            <span>{task.subtasks?.length || 0} subtasks</span>
+            <span>{task.subtasks?.length || 0} 个子任务</span>
             <Button
               type="link"
               icon={<PlusOutlined />}
               onClick={() => setIsSubtaskModalVisible(true)}
               size="small"
             >
-              Add Subtask
+              添加子任务
             </Button>
           </Space>
         </Descriptions.Item>
@@ -200,44 +241,69 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
 
       {task.subtasks && task.subtasks.length > 0 && (
         <>
-          <h3>Subtasks</h3>
+          <h3>子任务列表</h3>
           <List
             dataSource={task.subtasks}
             renderItem={(subtask) => (
               <List.Item>
-                <Card size="small" style={{ width: '100%' }}>
-                  <Space direction="vertical" style={{ width: '100%' }}>
+                <Card 
+                  size="small" 
+                  style={{ width: '100%' }}
+                  extra={
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleDeleteSubtask(subtask.id, subtask.title)}
+                    >
+                      删除
+                    </Button>
+                  }
+                >
+                  <Space direction="vertical" style={{ width: '100%' }} size="middle">
                     <div>
                       <strong>{subtask.title}</strong>
                       <Tag
-                        color={
-                          subtask.status === TaskStatus.COMPLETED ? 'success' : 'processing'
-                        }
+                        color={subtask.priority === TaskPriority.URGENT ? 'red' : 'blue'}
                         style={{ marginLeft: 8 }}
                       >
-                        {subtask.status}
-                      </Tag>
-                      <Tag
-                        color={subtask.priority === TaskPriority.URGENT ? 'red' : 'blue'}
-                        style={{ marginLeft: 4 }}
-                      >
-                        {subtask.priority}
+                        {{
+                          [TaskPriority.LOW]: '低',
+                          [TaskPriority.MEDIUM]: '中',
+                          [TaskPriority.HIGH]: '高',
+                          [TaskPriority.URGENT]: '紧急',
+                        }[subtask.priority]}
                       </Tag>
                     </div>
-                    {subtask.description && <div>{subtask.description}</div>}
+                    {subtask.description && <div style={{ color: '#666' }}>{subtask.description}</div>}
+                    <Space>
+                      <span>状态:</span>
+                      <Select
+                        value={subtask.status}
+                        onChange={(value) => handleSubtaskStatusChange(subtask.id, value)}
+                        style={{ width: 120 }}
+                        size="small"
+                      >
+                        <Option value={TaskStatus.PENDING}>待处理</Option>
+                        <Option value={TaskStatus.IN_PROGRESS}>进行中</Option>
+                        <Option value={TaskStatus.COMPLETED}>已完成</Option>
+                        <Option value={TaskStatus.CANCELLED}>已取消</Option>
+                      </Select>
+                    </Space>
                     {subtask.assignee && (
-                      <div>
-                        <UserOutlined /> Assignee: {subtask.assignee.username}
+                      <div style={{ fontSize: '14px' }}>
+                        <UserOutlined /> 执行人: {subtask.assignee.username}
                       </div>
                     )}
                     {(subtask.startTime || subtask.dueTime) && (
                       <div style={{ fontSize: '12px', color: '#888' }}>
                         {subtask.startTime && (
-                          <span>Start: {dayjs(subtask.startTime).format('YYYY-MM-DD HH:mm')}</span>
+                          <span>开始: {dayjs(subtask.startTime).format('YYYY-MM-DD HH:mm')}</span>
                         )}
                         {subtask.startTime && subtask.dueTime && <span> | </span>}
                         {subtask.dueTime && (
-                          <span>Due: {dayjs(subtask.dueTime).format('YYYY-MM-DD HH:mm')}</span>
+                          <span>截止: {dayjs(subtask.dueTime).format('YYYY-MM-DD HH:mm')}</span>
                         )}
                       </div>
                     )}
@@ -250,42 +316,77 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
         </>
       )}
 
-      <h3>Add Comment</h3>
-      <Form form={commentForm} onFinish={handleAddComment}>
+      <h3 style={{ marginTop: 24 }}>添加评论</h3>
+      <Form form={commentForm} onFinish={handleAddComment} style={{ marginTop: 16 }}>
         <Form.Item
           name="comment"
-          rules={[{ required: true, message: 'Please enter a comment' }]}
+          rules={[{ required: true, message: '请输入评论内容' }]}
         >
-          <TextArea rows={3} placeholder="Enter your comment..." />
+          <TextArea rows={3} placeholder="请输入评论内容..." />
         </Form.Item>
-        <Form.Item>
+        <Form.Item style={{ marginBottom: 0 }}>
           <Button type="primary" htmlType="submit" loading={loading}>
-            Add Comment
+            发表评论
           </Button>
         </Form.Item>
       </Form>
 
-      <Divider />
+      <Divider style={{ marginTop: 24 }} />
 
-      <h3>History</h3>
+      <h3 style={{ marginBottom: 16 }}>历史记录</h3>
       <Timeline
-        items={history.map((item) => ({
-          children: (
-            <div>
-              <div>
-                <strong>{item.user.username}</strong> - {item.actionType.replace('_', ' ')}
-              </div>
-              {item.comment && <div style={{ marginTop: 8 }}>{item.comment}</div>}
-              <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+        items={history.map((item) => {
+          const actionTypeMap: { [key: string]: string } = {
+            'CREATED': '创建',
+            'UPDATED': '更新',
+            'STATUS_CHANGED': '状态变更',
+            'ASSIGNEE_CHANGED': '执行人变更',
+            'COMPLETED': '完成',
+            'COMMENT': '评论',
+          };
+          
+          const isSubtask = item.task && item.taskId !== task.id;
+          
+          return {
+            children: (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 8 }}>
+                  <strong style={{ fontSize: 14 }}>{item.user.username}</strong>
+                  <span style={{ color: '#666', marginLeft: 8 }}>
+                    {actionTypeMap[item.actionType] || item.actionType}
+                  </span>
+                  {isSubtask && (
+                    <Tag color="blue" style={{ marginLeft: 8 }}>
+                      子任务: {item.task?.title}
+                    </Tag>
+                  )}
+                </div>
+              {item.comment && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    marginBottom: 8,
+                    padding: '8px 12px',
+                    background: '#f5f5f5',
+                    borderRadius: 4,
+                    fontSize: 14,
+                    lineHeight: '1.6',
+                  }}
+                >
+                  {item.comment}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>
                 {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')}
               </div>
             </div>
           ),
-        }))}
+        };
+        })}
       />
 
       <Modal
-        title="Create Subtask"
+        title="创建子任务"
         open={isSubtaskModalVisible}
         onCancel={() => {
           setIsSubtaskModalVisible(false);
@@ -297,18 +398,18 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
         <Form form={subtaskForm} layout="vertical" onFinish={handleCreateSubtask}>
           <Form.Item
             name="title"
-            label="Subtask Title"
-            rules={[{ required: true, message: 'Please input subtask title' }]}
+            label="子任务标题"
+            rules={[{ required: true, message: '请输入子任务标题' }]}
           >
-            <Input placeholder="Enter subtask title" />
+            <Input placeholder="请输入子任务标题" />
           </Form.Item>
 
-          <Form.Item name="description" label="Description">
-            <Input.TextArea rows={3} placeholder="Enter description (optional)" />
+          <Form.Item name="description" label="子任务描述">
+            <Input.TextArea rows={3} placeholder="请输入子任务描述（可选）" />
           </Form.Item>
 
-          <Form.Item name="assigneeId" label="Assign To">
-            <Select placeholder="Select assignee (optional)" allowClear>
+          <Form.Item name="assigneeId" label="指派执行人">
+            <Select placeholder="选择执行人（可选）" allowClear>
               {teamMembers.map((member) => (
                 <Select.Option key={member.user.id} value={member.user.id}>
                   {member.user.username}
@@ -317,29 +418,29 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
             </Select>
           </Form.Item>
 
-          <Form.Item name="priority" label="Priority" initialValue={TaskPriority.MEDIUM}>
+          <Form.Item name="priority" label="优先级" initialValue={TaskPriority.MEDIUM}>
             <Select>
-              <Select.Option value={TaskPriority.LOW}>Low</Select.Option>
-              <Select.Option value={TaskPriority.MEDIUM}>Medium</Select.Option>
-              <Select.Option value={TaskPriority.HIGH}>High</Select.Option>
-              <Select.Option value={TaskPriority.URGENT}>Urgent</Select.Option>
+              <Select.Option value={TaskPriority.LOW}>低</Select.Option>
+              <Select.Option value={TaskPriority.MEDIUM}>中</Select.Option>
+              <Select.Option value={TaskPriority.HIGH}>高</Select.Option>
+              <Select.Option value={TaskPriority.URGENT}>紧急</Select.Option>
             </Select>
           </Form.Item>
 
-          <Form.Item name="startTime" label="Start Time">
-            <DatePicker showTime style={{ width: '100%' }} placeholder="Select start time (optional)" />
+          <Form.Item name="startTime" label="开始时间">
+            <DatePicker showTime style={{ width: '100%' }} placeholder="选择开始时间（可选）" />
           </Form.Item>
 
-          <Form.Item name="dueTime" label="Due Time">
-            <DatePicker showTime style={{ width: '100%' }} placeholder="Select due time (optional)" />
+          <Form.Item name="dueTime" label="截止时间">
+            <DatePicker showTime style={{ width: '100%' }} placeholder="选择截止时间（可选）" />
           </Form.Item>
 
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" loading={loading}>
-                Create Subtask
+                创建子任务
               </Button>
-              <Button onClick={() => setIsSubtaskModalVisible(false)}>Cancel</Button>
+              <Button onClick={() => setIsSubtaskModalVisible(false)}>取消</Button>
             </Space>
           </Form.Item>
         </Form>

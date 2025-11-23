@@ -29,7 +29,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Logout',
+      label: '退出登录',
       onClick: handleLogout,
     },
   ];
@@ -38,7 +38,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'my-tasks',
       icon: <CheckSquareOutlined />,
-      label: 'My Tasks',
+      label: '我的任务',
       onClick: () => {
         setSelectedView('my-tasks');
         navigate('/');
@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'teams',
       icon: <TeamOutlined />,
-      label: 'Teams',
+      label: '我的团队',
       onClick: () => {
         setSelectedView('teams');
         navigate('/teams');

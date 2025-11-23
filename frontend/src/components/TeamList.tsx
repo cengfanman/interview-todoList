@@ -26,6 +26,8 @@ const TeamList: React.FC = () => {
     try {
       setLoading(true);
       const data = await teamService.getAll();
+      console.log('Loaded teams:', data);
+      console.log('Team members count:', data.map(t => ({ name: t.name, memberCount: t.members?.length || 0, members: t.members })));
       setTeams(data);
     } catch (error) {
       message.error('Failed to load teams');
@@ -86,9 +88,9 @@ const TeamList: React.FC = () => {
   return (
     <div>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>Teams</h2>
+        <h2>我的团队</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>
-          New Team
+          新建团队
         </Button>
       </div>
 
@@ -116,15 +118,15 @@ const TeamList: React.FC = () => {
                         icon={<UserAddOutlined />}
                         onClick={() => openInviteModal(team)}
                       >
-                        Invite
+                        邀请成员
                       </Button>,
                     ]
                   : []
               }
             >
-              <p>{team.description || 'No description'}</p>
+              <p>{team.description || '暂无描述'}</p>
               <p style={{ fontSize: 12, color: '#999' }}>
-                Members: {team.members?.length || 0}
+                成员数: {team.members?.length || 0}
               </p>
             </Card>
           </List.Item>
@@ -132,7 +134,7 @@ const TeamList: React.FC = () => {
       />
 
       <Modal
-        title="Create New Team"
+        title="新建团队"
         open={isModalVisible}
         onCancel={() => {
           setIsModalVisible(false);
@@ -143,26 +145,26 @@ const TeamList: React.FC = () => {
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Form.Item
             name="name"
-            label="Team Name"
-            rules={[{ required: true, message: 'Please input team name' }]}
+            label="团队名称"
+            rules={[{ required: true, message: '请输入团队名称' }]}
           >
-            <Input />
+            <Input placeholder="请输入团队名称" />
           </Form.Item>
 
-          <Form.Item name="description" label="Description">
-            <TextArea rows={4} />
+          <Form.Item name="description" label="团队描述">
+            <TextArea rows={4} placeholder="请输入团队描述（可选）" />
           </Form.Item>
 
           <Form.Item>
             <Button type="primary" htmlType="submit" block>
-              Create
+              创建团队
             </Button>
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title={`Invite Member to ${selectedTeam?.name}`}
+        title={`邀请成员到 ${selectedTeam?.name}`}
         open={isInviteModalVisible}
         onCancel={() => {
           setIsInviteModalVisible(false);
@@ -173,11 +175,11 @@ const TeamList: React.FC = () => {
         <Form form={inviteForm} layout="vertical" onFinish={handleInviteMember}>
           <Form.Item
             name="userId"
-            label="Select User"
-            rules={[{ required: true, message: 'Please select a user' }]}
+            label="选择用户"
+            rules={[{ required: true, message: '请选择要邀请的用户' }]}
           >
             <Select
-              placeholder="Select user to invite"
+              placeholder="选择要邀请的用户"
               showSearch
               filterOption={(input, option: any) =>
                 option.children.toLowerCase().includes(input.toLowerCase())
@@ -195,18 +197,18 @@ const TeamList: React.FC = () => {
 
           <Form.Item
             name="role"
-            label="Role"
+            label="角色"
             initialValue={TeamRole.MEMBER}
           >
             <Select>
-              <Select.Option value={TeamRole.MEMBER}>Member</Select.Option>
-              <Select.Option value={TeamRole.ADMIN}>Admin</Select.Option>
+              <Select.Option value={TeamRole.MEMBER}>成员</Select.Option>
+              <Select.Option value={TeamRole.ADMIN}>管理员</Select.Option>
             </Select>
           </Form.Item>
 
           <Form.Item>
             <Button type="primary" htmlType="submit" block>
-              Invite
+              邀请加入
             </Button>
           </Form.Item>
         </Form>
