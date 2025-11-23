@@ -324,6 +324,14 @@ const TaskList: React.FC = () => {
       render: (date) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'),
     },
     {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm'),
+      sorter: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      defaultSortOrder: 'descend' as const,
+    },
+    {
       title: '操作',
       key: 'actions',
       width: 150,
